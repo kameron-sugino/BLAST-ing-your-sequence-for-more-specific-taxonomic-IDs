@@ -1,19 +1,36 @@
 ---
-title: "20230815_BLAST_docs"
-output: word_document
-date: '2023-08-15'
+title: "BLAST_docs"
+output:
+  md_document:
+    variant: markdown_github
+    toc: true # table of content true
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
+    number_sections: true  ## if you want number sections at each table header
+date: '2024-02-20'
 ---
 
-* This is a short guide on using the NCBI BLAST command line software to identify bacterial taxonomies using DNA sequences
+And then I started BLAST-ing: how to take unknown taxa sequences and obtain a more specific ID
 
-  * The sequences used here are generated from a QIIME run of 16S V4-5 sequences. The goal was to take unclassified taxa of interest (in this case, taxa unclassified to the order or class level for Clostridia/Clostridiales) and get a better ID on who is in the community
-
-* For these runs, I got lucky and the Norman cluster servers had BLAST+ downloaded for use, so I only had to figure out how to download and unpack the reference database (the option "-remote" queues a run on the NCBI servers, so it's not much different than BLAST-ing on their browser (i.e., fails if there are too many queries)). 
-
-* For info on BLAST and installing BLAST+ see the following links (they're not great instructions, but will get you pointed in the right direction): https://www.ncbi.nlm.nih.gov/books/NBK52637/
+This is a short guide on using the NCBI BLAST command line software to identify bacterial taxonomies using DNA sequences. For more info on BLAST and installing BLAST+ see the following links (they're not great instructions, but will get you pointed in the right direction)
+  * https://www.ncbi.nlm.nih.gov/books/NBK52637/
   * Install BLAST+: https://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/
 
 
+# Introduction
+
+  * The sequences used here are generated from a QIIME run of 16S V4-5 sequences. The goal was to take unclassified taxa of interest (in this case, taxa unclassified to the order or class level for Clostridia/Clostridiales) and get a better ID on who is in the community
+
+* I ran the code on the Norman oscer servers, which had BLAST+ downloaded for use. I only had to figure out how to download and unpack the reference database. The option "-remote" queues a run on the NCBI servers, so it's not much different than BLAST-ing on their browser (i.e., fails if there are too many queries). 
+
+
+## Materials needed
+
+* To start you will need
+  * BLAST database 
+  * QIIME output tables
+
+### BLAST database setup
+ 
 * To download the database, follow the following:
 
 * Downloading 16S database on the server; all these steps occur on the shell, and should work if copy/pasted
@@ -47,8 +64,8 @@ make makefile
 ```
 
 * Download the taxa file to filter out undesired taxa assignments. Gotta FTP to the location (I used filezilla) ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
-  * The file is in a weird place: /pub/taxonomy/
-  * I had to manually navigate and download the file, which is weird, but so it goes
+  * This file is provided in the data folder, but should be updated before each run to make sure it is the most recent version.
+  * I had to manually navigate to /pub/taxonomy/ and download the file, which is weird, but so it goes
 
 * Run the following to set up the exclusion list:
 
@@ -64,6 +81,7 @@ grep "scientific name" names.dmp| grep -w -P "uncultured|environmental samples|m
 
 ```
 
+### Pulling required QIIME output
 
 * Before running the program below on the HPC, you need to grab files from the QIIME output that end in the following: 
   * \*taxonomy.qza 
@@ -94,13 +112,15 @@ grep "scientific name" names.dmp| grep -w -P "uncultured|environmental samples|m
   * taxonomy.tsv
   * dna-sequences.fasta
 
+# Retrieving sequences of interest
+
 * Note that here I am specifically pulling Clostridia that are unclassified past the order or class levels
   * The code will need to be rewritten to pull the specific taxa IDs of interest, so make sure you check that your output is correct
 
 ```{r, echo=T, eval=F}
 #merging taxonomy file with sequence file for BLAST analysis
-tax<-read.table("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Dec2021/indole_blast_files/taxonomy.tsv",sep="\t",header=T)
-seq<-read.table("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Dec2021/indole_blast_files/dna-sequences.fasta",header=F)
+tax<-read.table("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/taxonomy.tsv",sep="\t",header=T)
+seq<-read.table("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/dna-sequences.fasta",header=F)
 
 #reformat from fasta to table format
 seq.df<-data.frame(Column1 = seq$V1[c(TRUE, FALSE)], 
@@ -127,9 +147,10 @@ for(i in 1:nrow(a)){
   format<-rbind(format,paste0(">",a$Feature.ID[i]),a$Column2[i])
 }
 
-#write.table(format,"Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Dec2021/indole_blast_files/202300801_clostridia_seqs.txt",row.names = F,quote=F)
+#write.table(format,"C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/202300801_clostridia_seqs.txt",row.names = F,quote=F)
 ```
 
+# Running sequences through BLAST
 
 * Now, you can put the files on the HPC and run something like the code below; note that you need your fasta-formatted sequences, the BLAST database, and the exclusion list to remove all uncultured/environmental IDs from the search.
   * You'll need to change the file locations for a few commands:
@@ -149,6 +170,7 @@ for(i in 1:nrow(a)){
 ```
 
 
+# Formatting the output
 
 * The next steps use the following files:
   * output.txt (generated from the step above)
@@ -158,12 +180,11 @@ for(i in 1:nrow(a)){
 
 ```{r, echo=T, eval=F}
 
-df<-read.table("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/output.txt",fill=T,sep="\t",check.names = F,strip.white = F)
+df<-read.table("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/output.txt",fill=T,sep="\t",check.names = F,strip.white = F)
 
-#this code is extremely stupid, i'm so sorry
-#note that this code is different than that used in March 2023 for the Chabaan lab's probiotic study. It needs to be different because the separator used between the web-browsers method and the command line method of BLAST are different (I can use \t here but had to use a *space* in the web browser method, so it was much clunkier to work with--this code is still kind dumb though)
+#this code is not the best and I'm so sorry (but it works!)
+
 #if you see this an know of a better implementation (e.g., awk or something?) please let me know at kameron.sugino@gmail.com
-#if not, well, best of luck!
 
 #collect bacterial ID, and assembly score
 query.id<-df[,1]
@@ -181,7 +202,7 @@ reform.table<-data.frame(table(reform.max.merge$Group.1,reform.max.merge$bac.nam
 reform.table.e<-reform.table[reform.table$Freq>0,]
 
 #read in and merge total counts (for all samples) for each seq ID
-cnt<-read.csv("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/feature-frequency-detail.csv",header=F)
+cnt<-read.csv("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/feature-frequency-detail.csv",header=F)
 
 df.m<-merge(reform.table.e,cnt,by.x="Var1",by.y="V1")
 colnames(df.m)<-c("Feature_ID","BLAST_Taxa_ID","BLAST_ID_Count","Sequence_Count")
@@ -204,10 +225,8 @@ dupes.f<-dupes.m.merge.e[,-4]
 
 blast_final<-rbind(nodupes,dupes.f)
 
-#write.csv(blast_final,"Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/20230808_feature_summary_BLAST+_aligned.csv",row.names = F)
+write.csv(blast_final,"C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/20230808_feature_summary_BLAST+_aligned.csv",row.names = F)
 ```
-
-* Assuming the code above worked, great! (If not, sorry!)
 
 * We still have some processing to do before the data are ready to use.
 
@@ -216,9 +235,9 @@ blast_final<-rbind(nodupes,dupes.f)
 
 ```{r, echo=T, eval=F}
 #take the new IDs and merge them with the feature otu table from the *.biom files
-df<-read.csv("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/20230808_feature_summary_BLAST+_aligned.csv")
-feat<-read.table("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/table.from_biom.txt",header=T,fill=T)
-meta<-read.csv("Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/FMT_mouse_results/FMT-metadata.tsv",sep="\t")
+df<-read.csv("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/20230808_feature_summary_BLAST+_aligned.csv")
+feat<-read.table("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/table.from_biom.txt",header=T,fill=T)
+meta<-read.csv("C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/FMT-metadata.tsv",sep="\t")
 
 #merge complete otu table with ids to calculate relative abundance later
 otu.comp<-data.frame(gsub("X","",colnames(feat[,-1])),t(feat[,-1]))
@@ -238,7 +257,7 @@ colnames(otu)<-c("id",otu.test$BLAST_Taxa_ID)
 
 df.final<-merge(meta,otu,by.x="SeqID",by.y="id")
 
-#write.table(df.final,"Z:/Research/Friedman-Jonscher Lab/Microbiome data/Indole and PQQ MB/16S_seq_Raw_files_&_QIIME_output/Nov2022/Kams_QIIME_files/20230808_BLAST_OTU_table.txt",row.names = F, quote = F,sep='\t')
+write.table(df.final,"C:/Users/ksugino/Desktop/Github_projects/BLAST-ing-your-sequence-for-more-specific-taxonomic-IDs/data/20230808_BLAST_OTU_table.txt",row.names = F, quote = F,sep='\t')
 
 ```
 
